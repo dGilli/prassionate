@@ -1,49 +1,55 @@
-# AGENTS.md - Go Development Guidelines
+# AGENTS.md - Development Guidelines
 
 ## Build/Lint/Test Commands
 
+### Go Backend
 ```bash
-# Build the project
-go build ./...
+go build ./...              # Build project
+go test ./...               # Run all tests
+go test -run TestName ./path/to/package  # Run single test
+go test -v -run TestName ./internal/tracker  # Verbose single test
+go test -cover ./...        # Run with coverage
+go vet ./...                # Vet code
+gofmt -w .                  # Format
+goimports -w .              # Fix imports
+go mod tidy                 # Tidy dependencies
+go run ./cmd/app            # Run app
+make run                    # Run via Makefile
+```
 
-# Run all tests
-go test ./...
+### JavaScript Frontend
+```bash
+# Navigate to javascript directory
+cd javascript
 
-# Run a single test (replace TestName and ./path)
-go test -run TestName ./path/to/package
+# Install dependencies
+npm install
+
+# Build tracker script (outputs to web/static/)
+npm run build
+
+# Development server with hot reload
+npm run dev
+
+# Run tests
+npm test
+
+# Run tests once (for CI)
+npm run test:run
 
 # Run tests with coverage
-go test -cover ./...
+npm run test:coverage
 
-# Run tests with verbose output
-go test -v ./...
-
-# Lint with standard tools
-gofmt -d .
-govulncheck ./...
-go vet ./...
-
-# Format code
-gofmt -w .
-goimports -w .
-
-# Tidy dependencies
-go mod tidy
-
-# Download dependencies
-go mod download
-
-# Run the application
-go run ./cmd/app
+# Lint
+npm run lint
 ```
 
 ## Code Style Guidelines
 
-### Imports
-- Group imports: stdlib, third-party, internal
-- Use `goimports` for automatic formatting
-- Never use dot imports
-- Alias imports only when necessary for clarity
+### Go Backend
+
+#### Imports
+Group: stdlib, third-party, internal. Never use dot imports.
 
 ```go
 import (
@@ -51,118 +57,113 @@ import (
     "fmt"
     "time"
 
-    "github.com/pkg/errors"
-    "github.com/sirupsen/logrus"
+    "github.com/gorilla/mux"
 
     "github.com/dGilli/prassionate/internal/config"
 )
 ```
 
-### Formatting
-- Use `gofmt` - standard Go formatting
-- Max line length: 100 characters (soft limit)
-- Use tabs for indentation
-- Add empty line between function/method definitions
+#### Naming Conventions
+- **Packages**: lowercase, single word
+- **Exported**: PascalCase (`Server`, `TrackEvent`)
+- **Unexported**: camelCase (`server`, `trackEvent`)
+- **Interfaces**: `-er` suffix (`Tracker`, `Storer`)
+- **Constants**: MixedCaps
+- **Error variables**: `Err` prefix (`ErrNotFound`)
 
-### Naming Conventions
-- **Packages**: lowercase, single word, no underscores
-- **Exported**: PascalCase (e.g., `Server`, `HandleRequest`)
-- **Unexported**: camelCase (e.g., `server`, `handleRequest`)
-- **Interfaces**: `-er` suffix (e.g., `Reader`, `Writer`)
-- **Constants**: MixedCaps or ALL_CAPS for exported
-- **Variables**: Descriptive, avoid single letters except in loops
-- **Error variables**: Prefix with `Err` (e.g., `ErrNotFound`)
-
-### Types
-- Prefer concrete types over interfaces for return values
-- Define interfaces where they are used, not where they are implemented
-- Use struct tags for JSON, YAML, DB fields
-- Avoid `any` (interface{}) when possible
-
-### Error Handling
-- Always check errors immediately
-- Use `fmt.Errorf` with `%w` to wrap errors
-- Create sentinel errors for common cases
-- Do not ignore errors with `_`
-
+#### Error Handling
+Always wrap errors with context:
 ```go
 if err != nil {
-    return fmt.Errorf("failed to load config: %w", err)
+    return fmt.Errorf("failed to track event: %w", err)
 }
 ```
 
-### Functions
-- Keep functions small and focused
-- Return early to reduce nesting
-- Use named return values for documentation in complex functions
-- Accept interfaces, return concrete types
+#### Types
+- Prefer concrete types for return values
+- Define interfaces where they are used
+- Use struct tags for JSON/YAML
 
-### Concurrency
-- Always use context for cancellation
-- Never leak goroutines
-- Use `sync.WaitGroup` for coordination
-- Protect shared state with mutexes or channels
-
-### Testing
-- Table-driven tests preferred
-- Use `_test` package for black-box testing
-- Mock external dependencies
-- Test both happy path and error cases
-- Use `t.Parallel()` for independent tests
-
+#### Testing
 ```go
-func TestFoo(t *testing.T) {
+func TestTrackEvent(t *testing.T) {
     tests := []struct {
-        name     string
-        input    string
-        expected string
-        wantErr  bool
+        name    string
+        event   Event
+        wantErr bool
     }{
-        {"valid", "input", "output", false},
-        {"invalid", "", "", true},
+        {"valid pageview", Event{Type: "pageview"}, false},
+        {"invalid event", Event{}, true},
     }
     
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
             t.Parallel()
-            // test implementation
+            err := TrackEvent(tt.event)
+            if (err != nil) != tt.wantErr {
+                t.Errorf("TrackEvent() error = %v", err)
+            }
         })
     }
 }
 ```
 
+### JavaScript Frontend
+
+#### Code Style
+- Use ES6+ features
+- Prefer `const` and `let` over `var`
+- Use async/await for asynchronous code
+- CamelCase for variables/functions, PascalCase for classes
+
+#### Error Handling
+```javascript
+try {
+    await sendTrackingData(data);
+} catch (error) {
+    console.error('Tracking failed:', error);
+    // Fail silently - tracking should not break user experience
+}
+```
+
+#### Module Pattern
+Use IIFE to avoid global namespace pollution:
+```javascript
+(function(window, document) {
+    'use strict';
+    // Tracker implementation
+})(window, document);
+```
+
 ### Project Structure
 ```
 .
-├── cmd/           # Main applications
-├── internal/      # Private packages
-├── pkg/           # Public packages (optional)
-├── api/           # API definitions
-├── configs/       # Configuration files
-├── scripts/       # Build scripts
-├── go.mod
-└── README.md
+├── cmd/
+│   └── app/              # Main application entry
+├── internal/
+│   ├── api/              # HTTP handlers
+│   ├── tracker/          # Tracking logic
+│   ├── storage/          # Data persistence
+│   └── config/           # Configuration
+├── web/
+│   ├── static/           # Static assets (tracker.js)
+│   └── templates/        # HTML templates
+├── javascript/           # TypeScript tracker source
+│   ├── tracker.ts        # Main tracker module
+│   ├── tracker.test.ts   # Tests
+│   ├── vite.config.ts    # Vite configuration
+│   └── package.json      # JS dependencies
 ```
 
-### Documentation
-- Every exported symbol must have a doc comment
-- Comments are complete sentences starting with the symbol name
-- Include usage examples in README
+## Security Guidelines
+- Never commit secrets or API keys
+- Sanitize all user inputs
+- Use parameterized queries for DB
+- Validate tracker requests (CORS, API keys)
+- Respect DoNotTrack header
+- Anonymize IP addresses by default
 
-### Dependencies
-- Minimize external dependencies
-- Pin to specific versions in go.mod
-- Run `go mod tidy` before committing
-- Use `go vet` and `govulncheck` for security
-
-### Git
-- Commit messages: conventional commits format
+## Git
+- Conventional commits format
 - Single logical change per commit
-- No merge commits (rebase instead)
-
-## Security
-- Never commit secrets to the repository
-- Use environment variables for configuration
-- Validate all inputs
-- Use prepared statements for SQL
-- Sanitize user-generated content
+- Rebase instead of merge

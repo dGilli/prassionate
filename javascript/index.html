@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prassionate Tracker - Development</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    h1 { color: #333; }
+    .example { 
+      background: #f5f5f5; 
+      padding: 20px; 
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover { background: #0056b3; }
+    code {
+      background: #e9ecef;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Monaco', 'Menlo', monospace;
+    }
+    pre {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 4px;
+      overflow-x: auto;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .success { color: #28a745; }
+    .error { color: #dc3545; }
+    .info { color: #007bff; }
+  </style>
+</head>
+<body>
+  <h1>Prassionate Tracker Development</h1>
+  <p>Test page for the tracking solution. Make sure the Go server is running on port 8080.</p>
+  
+  <div class="example">
+    <h2>Server Status</h2>
+    <div id="server-status">Checking...</div>
+  </div>
+  
+  <div class="example">
+    <h2>Test Tracking Events</h2>
+    <button id="track-event">Track Event</button>
+    <button id="track-goal">Track Goal</button>
+    <button id="track-ecommerce">Track Ecommerce</button>
+    <button id="track-pageview">Track Pageview</button>
+    <button id="disable-tracking">Disable Tracking</button>
+  </div>
+
+  <div class="example">
+    <h2>Console Output</h2>
+    <pre id="console-output">Waiting for button clicks...</pre>
+  </div>
+
+  <div class="example">
+    <h2>How to Use</h2>
+    <ol>
+      <li>Start the Go server: <code>go run ./cmd/app</code></li>
+      <li>Start Vite dev server: <code>npm run dev</code> (in javascript/)</li>
+      <li>Click buttons above to send events</li>
+      <li>Watch Go server terminal for received events</li>
+    </ol>
+  </div>
+
+  <!-- Load tracker from Go server with correct endpoint -->
+  <script 
+    src="http://localhost:8080/static/tracker.iife.js" 
+    data-prassionate
+    data-endpoint="http://localhost:8080/api/track"
+    data-site-id="dev-site"
+  ></script>
+  
+  <script>
+    const output = document.getElementById('console-output');
+    const statusDiv = document.getElementById('server-status');
+    
+    // Capture console.log from tracker
+    const originalLog = console.log;
+    const originalError = console.error;
+    
+    console.log = function(...args) {
+      originalLog.apply(console, args);
+      // Show in page if it's tracker related
+      const message = args.join(' ');
+      if (message.includes('[Prassionate]')) {
+        log(message.replace('[Prassionate] ', ''), 'info');
+      }
+    };
+    
+    console.error = function(...args) {
+      originalError.apply(console, args);
+      const message = args.join(' ');
+      if (message.includes('Prassionate')) {
+        log('Error: ' + message, 'error');
+      }
+    };
+    
+    // Check server status
+    fetch('http://localhost:8080/health')
+      .then(() => {
+        statusDiv.innerHTML = '<span class="success">✓ Go server is running on localhost:8080</span>';
+      })
+      .catch(() => {
+        statusDiv.innerHTML = '<span class="error">✗ Go server not found. Run: go run ./cmd/app</span>';
+      });
+    
+    function log(message, type = 'info') {
+      const timestamp = new Date().toLocaleTimeString();
+      const line = document.createElement('div');
+      line.className = type;
+      line.textContent = `[${timestamp}] ${message}`;
+      output.insertBefore(line, output.firstChild);
+    }
+
+    // Wait for tracker to load
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        if (window.prassionate) {
+          log('Tracker loaded successfully', 'success');
+          
+          // Try to track a test event to verify connection
+          window.prassionate.track('test_connection', { page: window.location.href });
+          log('Sent test connection event', 'info');
+        } else {
+          log('Tracker not loaded - check console for errors', 'error');
+        }
+      }, 500); // Give tracker time to initialize
+    });
+
+    document.getElementById('track-event').addEventListener('click', () => {
+      if (window.prassionate) {
+        const props = { button: 'test', timestamp: Date.now() };
+        window.prassionate.track('button_click', props);
+        log(`Event sent: button_click (${JSON.stringify(props)})`, 'success');
+      } else {
+        log('Tracker not available', 'error');
+      }
+    });
+
+    document.getElementById('track-goal').addEventListener('click', () => {
+      if (window.prassionate) {
+        window.prassionate.trackGoal('signup', 50);
+        log('Goal sent: signup (value: 50)', 'success');
+      }
+    });
+
+    document.getElementById('track-ecommerce').addEventListener('click', () => {
+      if (window.prassionate) {
+        const products = [
+          { id: '1', name: 'Widget', price: 29.99 }
+        ];
+        window.prassionate.trackEcommerce('order-123', 99.99, products);
+        log('Ecommerce sent: order-123 ($99.99)', 'success');
+      }
+    });
+
+    document.getElementById('track-pageview').addEventListener('click', () => {
+      if (window.prassionate) {
+        window.prassionate.track('pageview', { manual: true });
+        log('Pageview sent (manual)', 'success');
+      }
+    });
+
+    document.getElementById('disable-tracking').addEventListener('click', () => {
+      if (window.prassionate) {
+        window.prassionate.push('disableTracking');
+        log('Tracking disabled - no more events will be sent', 'info');
+      }
+    });
+  </script>
+</body>
+</html>

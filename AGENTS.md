@@ -31,14 +31,10 @@ npm run build
 # Development server with hot reload
 npm run dev
 
-# Run tests
-npm test
-
-# Run tests once (for CI)
-npm run test:run
-
-# Run tests with coverage
-npm run test:coverage
+# Run tests (Vitest)
+npm test              # Run tests in watch mode
+npm run test:run      # Run tests once
+npm run test:coverage # Run tests with coverage
 
 # Lint
 npm run lint
